@@ -6,6 +6,7 @@ import (
         "google.golang.org/grpc"
         "github.com/tortuoise/cacheservice/rpc"
         "os"
+        "time"
 )
 
 
@@ -19,7 +20,7 @@ func ClientMain() {
 // RunClient Should just return the "raw" error from rpc calls
 func RunClient(ctx context.Context) error {
     // connnect
-    conn, err := grpc.Dial("localhost:5051", grpc.WithInsecure())
+    conn, err := grpc.Dial("localhost:5051", grpc.WithInsecure(), grpc.WithUnaryInterceptor(ClientInterceptor))
     if err != nil {
         return fmt.Errorf("failed to dial server: %v", err)
     }
@@ -44,4 +45,9 @@ func RunClient(ctx context.Context) error {
     return nil
 }
 
-
+func ClientInterceptor(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+        start := time.Now()
+        err := invoker(ctx, method, req, reply, cc, opts...)
+        fmt.Fprintf(os.Stderr, "invoke remote method=%s duration=%v error=%v", method, time.Since(start)/1e6, err)
+        return err
+}
