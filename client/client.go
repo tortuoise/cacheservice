@@ -4,6 +4,7 @@ import (
         "context"
 	"fmt"
         "google.golang.org/grpc"
+        "google.golang.org/grpc/metadata"
         "github.com/tortuoise/cacheservice/rpc"
         "os"
         "time"
@@ -47,6 +48,7 @@ func RunClient(ctx context.Context) error {
 
 func ClientInterceptor(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
         start := time.Now()
+        ctx = metadata.AppendToOutgoingContext(ctx, "requested", start.Format(time.UnixDate))
         err := invoker(ctx, method, req, reply, cc, opts...)
         fmt.Fprintf(os.Stderr, "invoke remote method=%s duration=%v error=%v", method, time.Since(start)/1e6, err)
         return err

@@ -5,6 +5,7 @@ import (
 	"fmt"
         "github.com/tortuoise/cacheservice/rpc"
         "google.golang.org/grpc"
+        "google.golang.org/grpc/metadata"
         "google.golang.org/grpc/codes"
         "google.golang.org/grpc/status"
         "math/rand"
@@ -25,7 +26,7 @@ func ServerMain() {
 }
 
 func RunServer() error {
-        srv := grpc.NewServer()
+        srv := grpc.NewServer(grpc.UnaryInterceptor(ServerInterceptor))
         ms := &CacheService{store: make(map[string][]byte), keysByAccount: make(map[string]int64)}
         rpc.RegisterCacheServer(srv, ms)
         rpc.RegisterAccountsServer(srv, ms)
@@ -107,4 +108,26 @@ func (s *CacheService) GetByToken(ctx context.Context, req *rpc.GetByTokenReq) (
                 return &rpc.GetByTokenResp{&rpc.Account{100}}, nil
         //}
         //return &rpc.GetByTokenResp{}, status.Errorf(codes.NotFound, "Token not found
+}
+
+func ServerInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
+        var t time.Time
+        md, ok := metadata.FromIncomingContext(ctx)
+        if ok {
+                now, aok := md["requested"]
+                if aok {
+                        fmt.Fprintf(os.Stderr, "requested: %s\n", now)
+                        t, err = time.Parse(time.UnixDate, now[0])
+                        if err != nil {
+                                fmt.Fprintf(os.Stderr, "resetting: %v\n", time.Now())
+                                t = time.Now()
+                        }
+                }
+        }
+        resp, err = handler(ctx, req)
+        if err == nil {
+                fmt.Fprintf(os.Stderr, "requested: %s\n", time.Since(t))
+                return resp, err
+        }
+        return nil, err
 }
